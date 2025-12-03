@@ -5,7 +5,6 @@ Trains a YOLOv8 model for dumpsite detection and exports it for Coral Edge TPU d
 """
 
 import os
-import subprocess
 import yaml
 import glob
 import numpy as np
@@ -35,11 +34,11 @@ if torch.cuda.is_available():
 ROBOFLOW_API_KEY = '5hjb3rLQ4gG1SyRaOorf'
 WORKSPACE = "drone-ihemm"
 PROJECT = "dumpsite-detection-vynfo-usuq1"
-VERSION = 1
+VERSION = 2
 
 EPOCHS = 100
 BATCH_SIZE = 8
-IMAGE_SIZE = 720
+IMAGE_SIZE = 320  # Using 320x320 for Edge TPU compatibility
 MODEL_NAME = 'yolov8n'
 PATIENCE = 20
 CONFIDENCE_THRESHOLD = 0.25
@@ -51,6 +50,7 @@ print("\n" + "="*50)
 print("Downloading Dataset")
 print("="*50)
 
+                
 rf = Roboflow(api_key=ROBOFLOW_API_KEY)
 project = rf.workspace(WORKSPACE).project(PROJECT)
 version = project.version(VERSION)
@@ -132,7 +132,7 @@ train_results = model.train(
     patience=PATIENCE,
     device=0 if torch.cuda.is_available() else 'cpu',
     project='yolo_coral_training',
-    name='run_720',
+    name=f'run_{IMAGE_SIZE}',
     exist_ok=True,
     pretrained=True,
     optimizer='Adam',
@@ -227,78 +227,61 @@ for img_path in test_images:
 print("\nPredictions saved to: test_predictions/")
 
 # =============================================================================
-# Export to TFLite
+# Export to Edge TPU
 # =============================================================================
 print("\n" + "="*50)
-print("Exporting to TensorFlow Lite")
+print("Exporting for Edge TPU")
 print("="*50)
 
+print(f"Exporting model with format='edgetpu' at {IMAGE_SIZE}x{IMAGE_SIZE}...")
+
+# Export directly to Edge TPU format - this handles TFLite conversion and
+# Edge TPU compilation in one step
 best_model.export(
-    format='tflite',
+    format='edgetpu',
     imgsz=IMAGE_SIZE,
-    int8=True,
-    data=data_yaml_path,
-    batch=1,
-    simplify=True,
-    opset=12,
-    dynamic=False,
+    data=data_yaml_path
 )
 
-# Find the exported TFLite model
-tflite_model_path = os.path.join(train_results.save_dir, 'weights', 'best_saved_model', 'best_int8.tflite')
+# Find the exported Edge TPU model
+edgetpu_model_path = None
+search_paths = [
+    os.path.join(train_results.save_dir, 'weights', 'best_full_integer_quant_edgetpu.tflite'),
+    os.path.join(train_results.save_dir, 'weights', 'best_int8_edgetpu.tflite'),
+    os.path.join(train_results.save_dir, 'weights', 'best_edgetpu.tflite'),
+]
 
-if not os.path.exists(tflite_model_path):
-    tflite_model_path = os.path.join(train_results.save_dir, 'weights', 'best_int8.tflite')
+for path in search_paths:
+    if os.path.exists(path):
+        edgetpu_model_path = path
+        break
 
-if os.path.exists(tflite_model_path):
-    model_size = os.path.getsize(tflite_model_path) / (1024 * 1024)
-    print(f"TFLite model exported: {tflite_model_path}")
+# If not found in expected locations, search recursively
+if not edgetpu_model_path:
+    edgetpu_files = glob.glob(os.path.join(train_results.save_dir, '**', '*_edgetpu.tflite'), recursive=True)
+    if edgetpu_files:
+        edgetpu_model_path = edgetpu_files[0]
+
+if edgetpu_model_path:
+    model_size = os.path.getsize(edgetpu_model_path) / (1024 * 1024)
+    print(f"\nEdge TPU model exported: {edgetpu_model_path}")
     print(f"Model size: {model_size:.2f} MB")
+
+    # Copy to a convenient location
+    os.makedirs('edge_tpu_models', exist_ok=True)
+    import shutil
+    dest_path = os.path.join('edge_tpu_models', os.path.basename(edgetpu_model_path))
+    shutil.copy2(edgetpu_model_path, dest_path)
+    print(f"Copied to: {dest_path}")
 else:
-    print("TFLite model not found at expected location")
-    # Search for any tflite files
+    print("\nWarning: Edge TPU model not found at expected locations")
+    print("Searching for any exported files...")
     tflite_files = glob.glob(os.path.join(train_results.save_dir, '**', '*.tflite'), recursive=True)
     if tflite_files:
         print("Found TFLite files:")
         for f in tflite_files:
-            print(f"  {f}")
-        tflite_model_path = tflite_files[0]
-
-# =============================================================================
-# Compile for Edge TPU
-# =============================================================================
-print("\n" + "="*50)
-print("Compiling for Edge TPU")
-print("="*50)
-
-os.makedirs('edge_tpu_models', exist_ok=True)
-
-if os.path.exists(tflite_model_path):
-    compile_cmd = f"edgetpu_compiler {tflite_model_path} -o edge_tpu_models/"
-    print(f"Running: {compile_cmd}")
-
-    result = subprocess.run(compile_cmd, shell=True, capture_output=True, text=True)
-
-    if result.returncode == 0:
-        print("Edge TPU compilation successful!")
-
-        edgetpu_models = glob.glob('edge_tpu_models/*_edgetpu.tflite')
-        if edgetpu_models:
-            edgetpu_model_path = edgetpu_models[0]
-            print(f"Edge TPU model: {edgetpu_model_path}")
-
-            log_file = edgetpu_model_path.replace('_edgetpu.tflite', '_edgetpu.log')
-            if os.path.exists(log_file):
-                print("\nCompilation log:")
-                with open(log_file, 'r') as f:
-                    print(f.read())
-    else:
-        print("Edge TPU compilation failed")
-        print(f"Error: {result.stderr}")
-        print("\nNote: edgetpu_compiler is only available on Linux.")
-        print("You can compile the model later on a Linux machine or use Google Colab.")
-else:
-    print("TFLite model not found for compilation")
+            size = os.path.getsize(f) / (1024 * 1024)
+            print(f"  {f} ({size:.2f} MB)")
 
 # =============================================================================
 # Create labels.txt
@@ -317,6 +300,12 @@ print("Classes:")
 for i, name in enumerate(class_names):
     print(f"  {i}: {name}")
 
+# Also save to edge_tpu_models directory
+os.makedirs('edge_tpu_models', exist_ok=True)
+with open('edge_tpu_models/labels.txt', 'w') as f:
+    for name in class_names:
+        f.write(f"{name}\n")
+
 # =============================================================================
 # Summary
 # =============================================================================
@@ -325,10 +314,11 @@ print("Training Complete - Summary")
 print("="*50)
 print(f"Training results: {train_results.save_dir}")
 print(f"Best PyTorch model: {best_model_path}")
-print(f"TFLite model: {tflite_model_path}")
+print(f"Edge TPU model: {edgetpu_model_path or 'See above for available files'}")
 print(f"Labels file: {labels_path}")
+print(f"\nModel trained at {IMAGE_SIZE}x{IMAGE_SIZE} for optimal Edge TPU performance")
 print("\nFor Raspberry Pi deployment, copy to your Pi:")
 print("  1. The *_edgetpu.tflite model from edge_tpu_models/")
-print("  2. labels.txt")
+print("  2. labels.txt (also in edge_tpu_models/)")
 print("  3. coral_yolo_detector.py")
 print("  4. Run install_raspberry_pi.sh to set up dependencies")
