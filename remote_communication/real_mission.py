@@ -10,90 +10,120 @@ if not hasattr(collections, "MutableMapping"):
 
 from dronekit import connect, VehicleMode
 
-# --- CONFIGURATION: UPDATE THIS TO MATCH YOUR DEVICE ---
-COM_PORT = "COM3"  # USB Port for Remote Controller
-BAUD_RATE = 115200  # Fixed: Standard for USB Serial (VCP)
+# --- CONFIGURATION ---
+# Fixed Configuration
+BAUD_RATE = 115200  # Standard for USB Serial (VCP)
 
+# Variable Configuration: UPDATE THIS TO MATCH YOUR DEVICE
+COM_PORT = "COM3"  # USB Port for Remote Controller
 CAM_INDEX = 1  # Camera Index for Goggle
 SERVO_CHANNEL = 1  # Channel for Servo Control
 
 
 def drop_payload(vehicle):
-    print("   [ACTION] Dropping Payload...")
+    print("[ACTION] Servo Opening...")
     # Open the Servo
     vehicle.channels.overrides[SERVO_CHANNEL] = 2000
     time.sleep(1.0)
     # Close the Servo
+    print("[ACTION] Servo Closing...")
     vehicle.channels.overrides[SERVO_CHANNEL] = 1000
-    print("   [ACTION] Servo Reset.")
 
 
 def handle_detection(vehicle):
-    print("\n!!! TRASH DETECTED !!!")
+    print("\n[LOG] Trash detected")
 
     # 1. INTERRUPT FLIGHT -> BRAKE
     # This overrides your manual stick inputs and holds position (requires GPS lock!)
-    print("1. Engaging Auto-Brake...")
+    print("[ACTION] Engaging Auto-Brake...")
     vehicle.mode = VehicleMode("BRAKE")
 
-    # Optional: Wait a moment for drone to settle
+    # Wait a moment for drone to settle
     time.sleep(1.5)
 
-    # 2. DROP TAG
+    # 2. DROP PAYLOAD
     drop_payload(vehicle)
 
-    print("Sequence Complete. Switch to LOITER or STABILIZE to regain control.")
+    print("[LOG] Switch back to GUIDED or other stable mode to regain control.")
 
-    # Simple debounce to prevent double-dropping
+    # Debounce to prevent double-dropping
     time.sleep(3)
 
 
-def main():
-    print(f"--- CONNECTING TO DRONE VIA RADIO ({COM_PORT}) ---")
-    print("1. Ensure Remote is in 'USB Serial (VCP)' mode.")
-    print("2. Ensure Drone is powered on and bound to Remote.")
-
+def connect_to_drone():
+    print(f"[LOG] Connecting to Drone via Radio ({COM_PORT})")
     try:
-        # We use wait_ready=False because ELRS bandwidth is low and full param download takes time
-        vehicle = connect(COM_PORT, baud=BAUD_RATE, wait_ready=False)
-        print(">>> LINK ESTABLISHED! <<<")
+        print("[LOG] Connected to Drone")
+        return connect(COM_PORT, baud=BAUD_RATE, wait_ready=False)
     except Exception as e:
-        print(f"Connection Error: {e}")
-        print("Check your COM port and ensure the Remote is connected.")
+        print(f"[ERROR] Connection Error: {e}")
+        print("[ERROR] Check your COM port and ensure the Remote is connected")
+        return None
+
+
+def setup_video_stream():
+    cap = cv2.VideoCapture(CAM_INDEX)
+    return cap
+
+
+def read_frame(cap):
+    ret, frame = cap.read()
+    if not ret:
+        print("[ERROR] Camera disconnected")
+        return None
+    return frame
+
+
+def process_keypress(key, vehicle):
+    # TODO: replace this with inference result trigger instead of keypress
+    if key == ord("d"):
+        handle_detection(vehicle)
+        return True
+    if key == ord("q"):
+        return False
+    return True
+
+
+def main():
+    vehicle = connect_to_drone()
+    if vehicle is None:
+        print("[ERROR] Failed to connect to Drone via Radio")
         sys.exit()
 
     # Setup the Video Stream for Goggle
-    cap = cv2.VideoCapture(CAM_INDEX)
+    cap = setup_video_stream()
+    if cap is None:
+        print("[ERROR] Failed to setup Video Stream")
+        sys.exit()
 
-    print("\n--- SYSTEM ARMED AND WATCHING ---")
+    # TODO: Start the Mission
+    print("\n[LOG] Mission Started")
 
+    # Main loop: Detect Trash -> Drop Payload -> Back to GUIDED mode
     try:
         while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("Error: Camera disconnected.")
+            frame = read_frame(cap)
+            if frame is None:
+                print("[ERROR] Camera disconnected")
                 break
 
             cv2.imshow("Drone Feed (Real)", frame)
             key = cv2.waitKey(1) & 0xFF
 
-            # --- REPLACE THIS WITH YOUR AI MODEL LATER ---
-            # For now, we still use 'd' to test the full loop in the real world
-            if key == ord("d"):
-                handle_detection(vehicle)
-
-            if key == ord("q"):
+            if not process_keypress(key, vehicle):
                 break
 
     except KeyboardInterrupt:
-        print("Script aborted by user.")
+        print("[LOG] Script aborted by user")
 
     finally:
         vehicle.close()
         cap.release()
         cv2.destroyAllWindows()
-        print("Connection Closed.")
+        print("[LOG] Connection Closed")
 
 
 if __name__ == "__main__":
+    # Ensure Remote is in 'USB Serial (VCP)' mode.
+    # Ensure Drone is powered on and connected to Remote.
     main()
