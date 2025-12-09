@@ -127,8 +127,8 @@ def main():
 
     # Setup the Video Stream for Goggle
     cap = setup_video_stream()
-    if cap is None:
-        print("[ERROR] Failed to setup Video Stream")
+    if not cap.isOpened():
+        print("[ERROR] Failed to open Video Stream")
         sys.exit()
 
     # TODO: Start the Mission
