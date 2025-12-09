@@ -13,6 +13,9 @@ from dronekit import connect, VehicleMode
 # --- CONFIGURATION ---
 # Fixed Configuration
 BAUD_RATE = 115200  # Standard for USB Serial (VCP)
+FRAME_WIDTH = 1280
+FRAME_HEIGHT = 720
+FPS = 30
 
 # Variable Configuration: UPDATE THIS TO MATCH YOUR DEVICE
 COM_PORT = "COM3"  # USB Port for Remote Controller
@@ -63,6 +66,9 @@ def connect_to_drone():
 
 def setup_video_stream():
     cap = cv2.VideoCapture(CAM_INDEX)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
+    cap.set(cv2.CAP_PROP_FPS, FPS)
     return cap
 
 
@@ -82,6 +88,22 @@ def process_keypress(key, vehicle):
     if key == ord("q"):
         return False
     return True
+
+
+def run_inference(frame):
+    """Placeholder for AI model inference. Return True when trash detected."""
+    # TODO: integrate your model here (e.g., YOLO, TFLite, ONNX)
+    return False
+
+
+def handle_frame_and_inputs(frame, key, vehicle):
+    # TODO: Uncomment this when the inference model is ready
+    # if run_inference(frame):
+    #     handle_detection(vehicle)
+    #     return True
+
+    # For testing, use keypress to trigger detection
+    return process_keypress(key, vehicle)
 
 
 def main():
@@ -110,7 +132,7 @@ def main():
             cv2.imshow("Drone Feed (Real)", frame)
             key = cv2.waitKey(1) & 0xFF
 
-            if not process_keypress(key, vehicle):
+            if not handle_frame_and_inputs(frame, key, vehicle):
                 break
 
     except KeyboardInterrupt:
