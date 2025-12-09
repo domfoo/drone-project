@@ -11,53 +11,66 @@ if not hasattr(collections, "MutableMapping"):
 from dronekit import connect, VehicleMode
 
 # --- CONFIGURATION ---
-# Fixed Configuration
 BAUD_RATE = 115200  # Standard for USB Serial (VCP)
-FRAME_WIDTH = 1280
-FRAME_HEIGHT = 720
+
+FRAME_WIDTH = 640
+FRAME_HEIGHT = 480
 FPS = 30
 
-# Variable Configuration: UPDATE THIS TO MATCH YOUR DEVICE
+SERVO_CHANNEL = 9  # Channel for Servo Control
+
+# UPDATE THIS TO MATCH YOUR DEVICE
 COM_PORT = "COM3"  # USB Port for Remote Controller
 CAM_INDEX = 1  # Camera Index for Goggle
-SERVO_CHANNEL = 1  # Channel for Servo Control
 
 
 def drop_payload(vehicle):
     print("[ACTION] Servo Opening...")
     # Open the Servo
-    vehicle.channels.overrides[SERVO_CHANNEL] = 2000
-    time.sleep(1.0)
+    vehicle.channels.overrides[str(SERVO_CHANNEL)] = 2000
+
+    # Small loop to keep window responsive while waiting
+    for _ in range(10):
+        cv2.waitKey(1)
+        time.sleep(0.1)
+
     # Close the Servo
     print("[ACTION] Servo Closing...")
-    vehicle.channels.overrides[SERVO_CHANNEL] = 1000
+    vehicle.channels.overrides[str(SERVO_CHANNEL)] = 1000
 
 
 def handle_detection(vehicle):
     print("\n[LOG] Trash detected")
 
     # 1. INTERRUPT FLIGHT -> BRAKE
-    # This overrides your manual stick inputs and holds position (requires GPS lock!)
+    # This overrides manual stick inputs and holds position (requires GPS lock!)
     print("[ACTION] Engaging Auto-Brake...")
     vehicle.mode = VehicleMode("BRAKE")
 
-    # Wait a moment for drone to settle
-    time.sleep(1.5)
+    # Wait 2 seconds for drone to stop (while keeping video alive)
+    for _ in range(20):
+        cv2.waitKey(1)
+        time.sleep(0.1)
 
     # 2. DROP PAYLOAD
     drop_payload(vehicle)
 
-    print("[LOG] Switch back to GUIDED or other stable mode to regain control.")
+    # TODO: Switch Flight Mode on Remote to regain control
+    print("[LOG] Drop complete. Switch Flight Mode on Remote to regain control")
 
-    # Debounce to prevent double-dropping
-    time.sleep(3)
+    # Debounce (Wait 3s before looking for trash again)
+    for _ in range(30):
+        cv2.waitKey(1)
+        time.sleep(0.1)
 
 
 def connect_to_drone():
     print(f"[LOG] Connecting to Drone via Radio ({COM_PORT})")
     try:
+        # ELRS is slower than a USB cable, so we need to increase the heartbeat timeout
+        vehicle = connect(COM_PORT, baud=BAUD_RATE, wait_ready=False, heartbeat_timeout=30)
         print("[LOG] Connected to Drone")
-        return connect(COM_PORT, baud=BAUD_RATE, wait_ready=False)
+        return vehicle
     except Exception as e:
         print(f"[ERROR] Connection Error: {e}")
         print("[ERROR] Check your COM port and ensure the Remote is connected")
