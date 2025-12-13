@@ -3,6 +3,7 @@ import collections.abc
 import cv2
 import time
 import sys
+import argparse
 
 # Patch DroneKit for Python 3.10+ compatibility:
 if not hasattr(collections, "MutableMapping"):
@@ -47,14 +48,15 @@ def connect_to_drone():
         return None
 
 
-def drop_payload(vehicle):
+def drop_payload(vehicle, use_camera=False):
     print("[ACTION] Servo Opening...")
     # Open the Servo
     vehicle.channels.overrides[str(SERVO_CHANNEL)] = 2000
 
     # Small loop to keep window responsive while waiting
     for _ in range(10):
-        cv2.waitKey(1)
+        if use_camera:
+            cv2.waitKey(1)
         time.sleep(0.1)
 
     # Close the Servo
@@ -62,7 +64,7 @@ def drop_payload(vehicle):
     vehicle.channels.overrides[str(SERVO_CHANNEL)] = 1000
 
 
-def handle_detection(vehicle):
+def handle_detection(vehicle, use_camera=False):
     print("\n[LOG] Trash detected")
 
     # 1. INTERRUPT FLIGHT -> BRAKE
@@ -72,18 +74,20 @@ def handle_detection(vehicle):
 
     # Wait 2 seconds for drone to stop (while keeping video alive)
     for _ in range(20):
-        cv2.waitKey(1)
+        if use_camera:
+            cv2.waitKey(1)
         time.sleep(0.1)
 
     # 2. DROP PAYLOAD
-    drop_payload(vehicle)
+    drop_payload(vehicle, use_camera)
 
     # TODO: Switch Flight Mode on Remote to regain control
     print("[LOG] Drop complete. Switch Flight Mode on Remote to regain control")
 
     # Debounce (Wait 3s before looking for trash again)
     for _ in range(30):
-        cv2.waitKey(1)
+        if use_camera:
+            cv2.waitKey(1)
         time.sleep(0.1)
 
 
@@ -103,10 +107,10 @@ def read_frame(cap):
     return frame
 
 
-def process_keypress(key, vehicle):
+def process_keypress(key, vehicle, use_camera=False):
     # TODO: replace this with inference result trigger instead of keypress
     if key == ord("d"):
-        handle_detection(vehicle)
+        handle_detection(vehicle, use_camera)
         return True
     if key == ord("q"):
         return False
@@ -119,14 +123,14 @@ def run_inference(frame):
     return False
 
 
-def handle_frame_and_inputs(frame, key, vehicle):
+def handle_frame_and_inputs(frame, key, vehicle, use_camera=False):
     # TODO: Uncomment this when the inference model is ready
     # if run_inference(frame):
-    #     handle_detection(vehicle)
+    #     handle_detection(vehicle, use_camera)
     #     return True
 
     # For testing, use keypress to trigger detection
-    return process_keypress(key, vehicle)
+    return process_keypress(key, vehicle, use_camera)
 
 
 def arm_for_testing(vehicle):
@@ -173,40 +177,55 @@ def arm_and_takeoff(aTargetAltitude, vehicle):
         time.sleep(1)
 
 
-def main():
+def main(real=False, camera=False):
     vehicle = connect_to_drone()
     if vehicle is None:
         print("[ERROR] Failed to connect to Drone via Radio")
         sys.exit()
 
-    # Setup the Video Stream for Goggle
-    cap = setup_video_stream()
-    if not cap.isOpened():
-        print("[ERROR] Failed to open Video Stream")
-        sys.exit()
+    # Setup the Video Stream for Goggle (only if camera is True)
+    cap = None
+    if camera:
+        cap = setup_video_stream()
+        if not cap.isOpened():
+            print("[ERROR] Failed to open Video Stream")
+            sys.exit()
+        print("[LOG] Video Stream initialized")
+    else:
+        print("[LOG] Running without video stream")
 
     # Start the Mission - Arm & Takeoff & Go to GUIDED
     print("\n[LOG] Mission Started")
 
-    # Testing: only arm the drone on the table
-    # arm_and_takeoff(10, vehicle)
-    arm_for_testing(vehicle)
+    # Use real arm_and_takeoff if real=True, else use arm_for_testing
+    if real:
+        print("[LOG] Using real arm_and_takeoff")
+        arm_and_takeoff(10, vehicle)
+    else:
+        print("[LOG] Using arm_for_testing")
+        arm_for_testing(vehicle)
 
     # Main loop: Detect Trash -> Drop Payload -> Back to GUIDED mode
     try:
-        while True:
-            time.sleep(1)
-        while True:
-            frame = read_frame(cap)
-            if frame is None:
-                print("[ERROR] Camera disconnected")
-                break
+        if camera:
+            # Main loop with video stream
+            while True:
+                frame = read_frame(cap)
+                if frame is None:
+                    print("[ERROR] Camera disconnected")
+                    break
 
-            cv2.imshow("Drone Feed (Real)", frame)
-            key = cv2.waitKey(1) & 0xFF
+                cv2.imshow("Drone Feed (Real)", frame)
+                key = cv2.waitKey(1) & 0xFF
 
-            if not handle_frame_and_inputs(frame, key, vehicle):
-                break
+                if not handle_frame_and_inputs(frame, key, vehicle, use_camera=True):
+                    break
+        else:
+            # Main loop without video stream
+            print("[LOG] Running main loop without camera (press Ctrl+C to exit)")
+            while True:
+                time.sleep(1)
+                # TODO: Add detection logic here that doesn't require camera frames
 
     except KeyboardInterrupt:
         print("[LOG] Script aborted by user")
@@ -215,13 +234,31 @@ def main():
         if vehicle and vehicle.armed:
             vehicle.armed = False  # Disarm the vehicle before closing
             print("[LOG] Motors Disarmed.")
+        if vehicle:
             vehicle.close()
-        cap.release()
-        cv2.destroyAllWindows()
+        if cap is not None:
+            cap.release()
+            cv2.destroyAllWindows()
         print("[LOG] Connection Closed")
 
 
 if __name__ == "__main__":
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Drone Mission Control Script")
+    parser.add_argument(
+        "--real",
+        action="store_true",
+        default=False,
+        help="Use real arm_and_takeoff function (default: False, uses arm_for_testing)",
+    )
+    parser.add_argument(
+        "--camera",
+        action="store_true",
+        default=False,
+        help="Setup and use video stream (default: False, runs without camera)",
+    )
+    args = parser.parse_args()
+
     # Ensure Remote is in 'USB Serial (VCP)' mode.
     # Ensure Drone is powered on and connected to Remote.
-    main()
+    main(real=args.real, camera=args.camera)
