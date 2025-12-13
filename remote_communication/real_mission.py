@@ -11,7 +11,7 @@ if not hasattr(collections, "MutableMapping"):
 from dronekit import connect, VehicleMode
 
 # --- CONFIGURATION ---
-BAUD_RATE = 115200  # Standard for USB Serial (VCP)
+BAUD_RATE = 460800  # 57600 or 230400
 
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
@@ -20,8 +20,31 @@ FPS = 30
 SERVO_CHANNEL = 9  # Channel for Servo Control
 
 # UPDATE THIS TO MATCH YOUR DEVICE
-COM_PORT = "COM3"  # USB Port for Remote Controller
+CONNECTION_STRING = "udp:0.0.0.0:14550"  # Connect through UDP
 CAM_INDEX = 1  # Camera Index for Goggle
+
+
+def message_callback(self, name, message):
+    # The pre-arm check status is often sent as a STATUSTEXT message
+    if name == "STATUSTEXT":
+        # Print the error text to the console
+        print(f" [APM MESSAGE]: {message.text}")
+
+
+def connect_to_drone():
+    print(f"[LOG] Connecting to Drone via Radio ({CONNECTION_STRING})")
+    try:
+        # ELRS is slower than a USB cable, so we need to increase the heartbeat timeout
+        vehicle = connect(
+            CONNECTION_STRING, baud=BAUD_RATE, wait_ready=False, heartbeat_timeout=30
+        )
+        print("[LOG] Connected to Drone")
+        vehicle.add_message_listener("STATUSTEXT", message_callback)
+        return vehicle
+    except Exception as e:
+        print(f"[ERROR] Connection Error: {e}")
+        print("[ERROR] Check your COM port and ensure the Remote is connected")
+        return None
 
 
 def drop_payload(vehicle):
@@ -62,19 +85,6 @@ def handle_detection(vehicle):
     for _ in range(30):
         cv2.waitKey(1)
         time.sleep(0.1)
-
-
-def connect_to_drone():
-    print(f"[LOG] Connecting to Drone via Radio ({COM_PORT})")
-    try:
-        # ELRS is slower than a USB cable, so we need to increase the heartbeat timeout
-        vehicle = connect(COM_PORT, baud=BAUD_RATE, wait_ready=False, heartbeat_timeout=30)
-        print("[LOG] Connected to Drone")
-        return vehicle
-    except Exception as e:
-        print(f"[ERROR] Connection Error: {e}")
-        print("[ERROR] Check your COM port and ensure the Remote is connected")
-        return None
 
 
 def setup_video_stream():
@@ -119,6 +129,50 @@ def handle_frame_and_inputs(frame, key, vehicle):
     return process_keypress(key, vehicle)
 
 
+def arm_for_testing(vehicle):
+    """
+    Checks for armability, attempts to arm the vehicle, and waits for confirmation.
+    It performs NO takeoff or altitude checks.
+    """
+    print("[LOG] Arm Testing Started")
+    # 2. Set mode to STABILIZE and arm the motors
+    # ONLY USE STABILIZE HERE FOR TESTING !!!!
+    vehicle.mode = VehicleMode("STABILIZE")
+    vehicle.armed = True
+
+    # 3. Wait for arming confirmation
+    while not vehicle.armed:
+        print("[LOG] Waiting for arming confirmation...")
+        time.sleep(1)
+
+    print("[SUCCESS] Motors ARMED.")
+    print("--------------------------------")
+
+
+def arm_and_takeoff(aTargetAltitude, vehicle):
+    print("[LOG] Basic pre-arm checks")
+    while not vehicle.is_armable:
+        print("[LOG] Waiting for vehicle to initialise...")
+        time.sleep(1)
+
+    print("[LOG] Arming motors")
+    vehicle.mode = VehicleMode("GUIDED")
+    vehicle.armed = True
+
+    while not vehicle.armed:
+        print("[LOG] Waiting for arming...")
+        time.sleep(1)
+
+    # vehicle.simple_takeoff(aTargetAltitude)
+
+    while True:
+        print(f" Altitude: {vehicle.location.global_relative_frame.alt}")
+        if vehicle.location.global_relative_frame.alt >= aTargetAltitude * 0.95:
+            print("Reached target altitude")
+            break
+        time.sleep(1)
+
+
 def main():
     vehicle = connect_to_drone()
     if vehicle is None:
@@ -131,11 +185,17 @@ def main():
         print("[ERROR] Failed to open Video Stream")
         sys.exit()
 
-    # TODO: Start the Mission
+    # Start the Mission - Arm & Takeoff & Go to GUIDED
     print("\n[LOG] Mission Started")
+
+    # Testing: only arm the drone on the table
+    # arm_and_takeoff(10, vehicle)
+    arm_for_testing(vehicle)
 
     # Main loop: Detect Trash -> Drop Payload -> Back to GUIDED mode
     try:
+        while True:
+            time.sleep(1)
         while True:
             frame = read_frame(cap)
             if frame is None:
@@ -152,7 +212,10 @@ def main():
         print("[LOG] Script aborted by user")
 
     finally:
-        vehicle.close()
+        if vehicle and vehicle.armed:
+            vehicle.armed = False  # Disarm the vehicle before closing
+            print("[LOG] Motors Disarmed.")
+            vehicle.close()
         cap.release()
         cv2.destroyAllWindows()
         print("[LOG] Connection Closed")
