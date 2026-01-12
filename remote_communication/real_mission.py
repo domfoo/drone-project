@@ -10,6 +10,7 @@ if not hasattr(collections, "MutableMapping"):
     collections.MutableMapping = collections.abc.MutableMapping
 
 from dronekit import connect, VehicleMode
+from pymavlink import mavutil
 
 # --- CONFIGURATION ---
 BAUD_RATE = 460800  # 57600 or 230400
@@ -18,7 +19,10 @@ FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 FPS = 30
 
-SERVO_CHANNEL = 9  # Channel for Servo Control
+# SERVO CONFIG
+PAYLOAD_SERVO_ID = 9     # ID used in MAVLink command (must match Pi script)
+PWM_OPEN = 2000          # PWM value for Open
+PWM_CLOSE = 1000         # PWM value for Close
 
 # UPDATE THIS TO MATCH YOUR DEVICE
 CONNECTION_STRING = "udp:0.0.0.0:14550"  # Connect through UDP
@@ -49,19 +53,36 @@ def connect_to_drone():
 
 
 def drop_payload(vehicle, use_camera=False):
-    print("[ACTION] Servo Opening...")
-    # Open the Servo
-    vehicle.channels.overrides[str(SERVO_CHANNEL)] = 2000
+    print("[ACTION] Sending Drop Command (Open)...")
+    
+    # Construct MAVLink command: MAV_CMD_DO_SET_SERVO (183)
+    msg = vehicle.message_factory.command_long_encode(
+        0, 0,    # target_system, target_component
+        mavutil.mavlink.MAV_CMD_DO_SET_SERVO, 
+        0,       # confirmation
+        PAYLOAD_SERVO_ID,  # param1: Servo instance number
+        PWM_OPEN,          # param2: PWM value
+        0, 0, 0, 0, 0      # param3-7 (unused)
+    )
+    vehicle.send_mavlink(msg)
 
-    # Small loop to keep window responsive while waiting
-    for _ in range(10):
+    # Wait for mechanism to open
+    for _ in range(20): # 2 seconds
         if use_camera:
             cv2.waitKey(1)
         time.sleep(0.1)
 
-    # Close the Servo
-    print("[ACTION] Servo Closing...")
-    vehicle.channels.overrides[str(SERVO_CHANNEL)] = 1000
+    print("[ACTION] Sending Reset Command (Close)...")
+    # Construct MAVLink command to Close
+    msg = vehicle.message_factory.command_long_encode(
+        0, 0,
+        mavutil.mavlink.MAV_CMD_DO_SET_SERVO,
+        0,
+        PAYLOAD_SERVO_ID,
+        PWM_CLOSE,
+        0, 0, 0, 0, 0
+    )
+    vehicle.send_mavlink(msg)
 
 
 def handle_detection(vehicle, use_camera=False):
