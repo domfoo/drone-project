@@ -65,6 +65,10 @@ pip install dronekit-sitl   # For simulation only
 
 #### Run the script
 
+* Connect to RC WIFI `ExpressLRS TX Backpack 000000 / expresslrs`
+* Check connection `http://10.0.0.1`
+* Run the script to connect
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
@@ -83,13 +87,15 @@ Step 1: Hardware Wiring
 1. Flight Controller (FC) $\leftrightarrow$ Raspberry Pi:
     * UART 4 accroding to specifications
 2. Raspberry Pi $\leftrightarrow$ Servo:
-    * *Ask Dominik* about the wiring
+    * Yellow: 13 (GPIO 27)
+    * Red: 4
+    * Brown (Ground): 14
 
 Step 2: FC Configuration on QGroundControl
 | Parameter         | Value | Description                              |
 |-------------------|-------|------------------------------------------|
 | SERIAL4_PROTOCOL  | 2     | Sets protocol to MAVLink 2. **SERIAL4 due to UART4**.              |
-| SERIAL4_BAUD      | 921   | Sets speed to 921600 baud (fast link for Pi). Make sure BAUD config on Pi also matched. |
+| SERIAL4_BAUD      | 921 (Old: 460)   | Sets speed to 921600 baud (fast link for Pi). Make sure BAUD config on Pi also matched. |
 
 Step 3: Raspberry Pi Setup to listen for command from FC to trigger servo
 1. SSH into your Raspberry Pi
@@ -169,3 +175,7 @@ if __name__ == '__main__':
         GPIO.cleanup()
 ```
 
+
+NOTE:
+* For `servo_listener.py` to test the listener from FC to RasberryPi and print `hello`. Enable serial in raspberry pi configs, try to run file again. After starting successfully, try to send command from the computer.
+* For servo, currently cannot make the servo work. Ask other teams how they setup the servo with rasberry pi
