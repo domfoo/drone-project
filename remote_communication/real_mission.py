@@ -102,8 +102,8 @@ def handle_detection(vehicle, use_camera=False):
     # 2. DROP PAYLOAD
     drop_payload(vehicle, use_camera)
 
-    # TODO: Switch Flight Mode on Remote to regain control
     print("[LOG] Drop complete. Switch Flight Mode on Remote to regain control")
+    vehicle.mode = VehicleMode("GUIDED")
 
     # Debounce (Wait 3s before looking for trash again)
     for _ in range(30):
@@ -129,12 +129,11 @@ def read_frame(cap):
 
 
 def process_keypress(key, vehicle, use_camera=False):
-    # TODO: replace this with inference result trigger instead of keypress
     if key == ord("d"):
         handle_detection(vehicle, use_camera)
         return True
     if key == ord("q"):
-        return False
+        return False  # Return False to break the loop
     return True
 
 
@@ -144,17 +143,23 @@ def run_inference(frame):
     return False
 
 
-def handle_frame_and_inputs(frame, key, vehicle, use_camera=False):
-    # TODO: Uncomment this when the inference model is ready
-    # if run_inference(frame):
-    #     handle_detection(vehicle, use_camera)
-    #     return True
+def handle_frame_and_inputs(frame, key, vehicle, real=False):
+    # Always allow manual key control (both real and test modes)
+    if key != 0xFF:
+        if not process_keypress(key, vehicle, use_camera=real):
+            # Return False to signal main loop to stop (e.g., on 'q')
+            return False
 
-    # For testing, use keypress to trigger detection
-    return process_keypress(key, vehicle, use_camera)
+    # When real=True, also run AI inference so the system works autonomously
+    if real:
+        if run_inference(frame):
+            handle_detection(vehicle, use_camera=True)
+
+    # Continue mission loop by default
+    return True
 
 
-def arm_for_testing(vehicle):
+def arm_only(vehicle):
     """
     Checks for armability, attempts to arm the vehicle, and waits for confirmation.
     It performs NO takeoff or altitude checks.
@@ -174,7 +179,7 @@ def arm_for_testing(vehicle):
     print("--------------------------------")
 
 
-def arm_and_takeoff(aTargetAltitude, vehicle):
+def arm_and_auto(aTargetAltitude, vehicle):
     print("[LOG] Basic pre-arm checks")
     while not vehicle.is_armable:
         print("[LOG] Waiting for vehicle to initialise...")
@@ -188,7 +193,7 @@ def arm_and_takeoff(aTargetAltitude, vehicle):
         print("[LOG] Waiting for arming...")
         time.sleep(1)
 
-    # vehicle.simple_takeoff(aTargetAltitude)
+    vehicle.simple_takeoff(aTargetAltitude)
 
     while True:
         print(f" Altitude: {vehicle.location.global_relative_frame.alt}")
@@ -198,62 +203,52 @@ def arm_and_takeoff(aTargetAltitude, vehicle):
         time.sleep(1)
 
 
-def main(real=False, camera=False):
+def main(real=False):
+    # 1. Connect to drone
     vehicle = connect_to_drone()
     if vehicle is None:
         print("[ERROR] Failed to connect to Drone via Radio")
         sys.exit()
 
-    # Setup the Video Stream for Goggle (only if camera is True)
+    # 2. Setup the Video Stream for Goggle
     cap = None
-    if camera:
-        cap = setup_video_stream()
-        if not cap.isOpened():
-            print("[ERROR] Failed to open Video Stream")
-            sys.exit()
-        print("[LOG] Video Stream initialized")
-    else:
-        print("[LOG] Running without video stream")
+    cap = setup_video_stream()
+    if not cap.isOpened():
+        print("[ERROR] Failed to open Video Stream")
+        sys.exit()
+    print("[LOG] Video Stream initialized")
 
-    # Start the Mission - Arm & Takeoff & Go to GUIDED
     print("\n[LOG] Mission Started")
 
-    # Use real arm_and_takeoff if real=True, else use arm_for_testing
+    # 3. Start mission: Use arm_and_auto if real=True, else use arm_only
     if real:
-        print("[LOG] Using real arm_and_takeoff")
-        arm_and_takeoff(10, vehicle)
+        print("[LOG] Using real arm_and_auto")
+        arm_and_auto(10, vehicle)
     else:
-        print("[LOG] Using arm_for_testing")
-        arm_for_testing(vehicle)
+        print("[LOG] Using arm_only")
+        arm_only(vehicle)
 
-    # Main loop: Detect Trash -> Drop Payload -> Back to GUIDED mode
+    # 4. Main mission: GUIDED mode -> Detect Trash -> (optional) Back to position trash detected -> Drop Payload -> GUIDED mode
     try:
-        if camera:
-            # Main loop with video stream
-            while True:
-                frame = read_frame(cap)
-                if frame is None:
-                    print("[ERROR] Camera disconnected")
-                    break
+        while True:
+            frame = read_frame(cap)
+            if frame is None:
+                print("[ERROR] Camera disconnected")
+                break
 
-                cv2.imshow("Drone Feed (Real)", frame)
-                key = cv2.waitKey(1) & 0xFF
+            cv2.imshow("Drone Feed (Real)", frame)
+            key = cv2.waitKey(1) & 0xFF
 
-                if not handle_frame_and_inputs(frame, key, vehicle, use_camera=True):
-                    break
-        else:
-            # Main loop without video stream
-            print("[LOG] Running main loop without camera (press Ctrl+C to exit)")
-            while True:
-                time.sleep(1)
-                # TODO: Add detection logic here that doesn't require camera frames
+            if not handle_frame_and_inputs(frame, key, vehicle, real):
+                break
 
-    except KeyboardInterrupt:
-        print("[LOG] Script aborted by user")
+    except Exception as e:
+        print("[ERROR] Exception while running mission: ", e)
 
     finally:
+        # Process before termination
         if vehicle and vehicle.armed:
-            vehicle.armed = False  # Disarm the vehicle before closing
+            vehicle.armed = False
             print("[LOG] Motors Disarmed.")
         if vehicle:
             vehicle.close()
@@ -270,16 +265,10 @@ if __name__ == "__main__":
         "--real",
         action="store_true",
         default=False,
-        help="Use real arm_and_takeoff function (default: False, uses arm_for_testing)",
-    )
-    parser.add_argument(
-        "--camera",
-        action="store_true",
-        default=False,
-        help="Setup and use video stream (default: False, runs without camera)",
+        help="Use real arm_and_auto function (default: False, uses arm_only)",
     )
     args = parser.parse_args()
 
     # Ensure Remote is in 'USB Serial (VCP)' mode.
     # Ensure Drone is powered on and connected to Remote.
-    main(real=args.real, camera=args.camera)
+    main(real=args.real)

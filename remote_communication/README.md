@@ -75,8 +75,7 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 
-python remote_communication/real_mission.py --real=true --camera=true
-python remote_communication/real_mission.py --real=true --camera=true
+python remote_communication/real_mission.py --real=true
 ```
 
 ## Servo Configuration
