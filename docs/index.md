@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Dokumentation
+title: Home
 ---
 
-# Hallo, Drohne
+# Drone Project
