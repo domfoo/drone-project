@@ -11,7 +11,7 @@ UDP_PORT = 5005
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 FPS = 30
-CAM_INDEX = 1  # Camera Index for Goggle/Receiver connected to Mac
+CAM_INDEX = 0  # Camera Index for Goggle/Receiver connected to Mac
 
 def trigger_drone_action(command):
     """Sends a UDP command string to the Raspberry Pi bridge via Netcat."""
