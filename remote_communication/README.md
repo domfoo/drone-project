@@ -1,180 +1,108 @@
-# Remote Communication between Computer and Drone via Telemetry
+# REMOTE COMMUNICATION USING COMPANION COMPUTER (RASPBERRY PI)
 
-## Communication Bridge Configuration (MAVLink over ELRS)
+## 1. System Architecture
+The system uses a decoupled architecture to ensure the Raspberry Pi's CPU remains free for hardware tasks while the MacBook handles heavy AI processing
 
-We use Radiomaster connected to Computer to communicate with the Drone.
+* **Local Computer:** Runs the AI detection model (`inference.py`) and transmits commands via UDP using Netcat (nc). The `MissionController` class bridges inference detections + keyboard control to the Raspberry Pi
+* **Raspberry Pi:** Receives network packets via `drone_control_listener.py`, maintains a MAVLink heartbeat with the FC, bridges signals from Local Computer to Flight Controller and controls the servo via GPIO
+* **Flight Controller:** Executes signals for flight modes (Brake, Auto, RTL) and motor arming
 
-*Reference: https://www.expresslrs.org/software/mavlink*
+## 2. First-Time Setup
 
-#### Prerequisites:
-* Transmitter/Receiver firmware: 3.6.2
-* TX Backpack firmware: 1.5.4
-* FC Firmware: Ardupilot
+### MacBook Configuration
 
-**1. ArduCopter Drone MAVLink Settings:** Setup Drone Parameters to accept Mavlink protocol
+* Dependencies: Install OpenCV and ensure nc is available in your terminal
 
-| Parameter        | Value               | Description                                                                                          |
-|------------------|---------------------|------------------------------------------------------------------------------------------------------|
-| SERIALx_PROTOCOL | 2 (Mavlink2)        | Tells the specified SERIAL to listen for MAVLink telemetry.                                          |
-| SERIALx_BAUD     | 460                 | Fixed Baud Rate for Mavlink according to the documentation.                                          |
-| RSSI_TYPE        | 5 (TelemetryRadioR) |                                                                                                      |
+### Raspberry Pi Configuration
 
-*Replace `x` with SERIAL that Remote Controller connects to (to be honest, I do not remember which number in our real drone 😭)*
+* Bridge Script: Save `drone_control_listener.py` to `/home/tpu/`
+* Auto-Run Setup: Create a systemd service at `/etc/systemd/system/drone_bridge.service` to run the script on boot
+* Hardware Link: Connect Pi UART (/dev/serial0) to the FC UART and GPIO 18 to the servo signal wire
 
-**2. Remote Controller ExpressLRS (ELRS) Firmware Settings:** Update the ELRS Lua script on your Radiomaster controller.
+## 3. Operational Workflow (Every Flight)
 
-**For TX Settings:** Update these settings in ExpressLRS menu:
+### Step 1: Power & Network
 
-| Setting         | Value(s)       | Description                                                                                        |
-|-----------------|----------------|----------------------------------------------------------------------------------------------------|
-| Packet Rate     | 333Hz Full Res | High frequency to download parameters from drone to computer.                                      |
-| Telemetry Ratio | 1:2            | Ensures a robust bidirectional data link required for MAVLink commands.                            |
-| Link Mode       | MavLink        | Use MavLink communication mode                                                                     |
-
-**For RX Settings:**
-Make sure Link Mode for RX is also set to `MavLink` in `Other Devices` menu
-
-**3. Setup connection between Computer and Remote Controller:** Connect Computer to Remote Controller using UDP.
-
-1. Turn on WIFI on Remote Controller: `ExpressLRS` -> `Backpack` -> `Telemetry` -> `WiFi`. After a while (~30s), a new WIFI connection `ExpressLRS TX Backpack 000000` should be created.
-2. Connect Computer to created WIFI:
+1. Connect the Local Computer & Raspberry Pi to the same network (same subnet)
 ```
-Name: ExpressLRS TX Backpack 000000
-Password: expresslrs
+WIFI NAME: drohn3 
+PASSWORD: geheim123
 ```
-3. Test connection: Open `http://elrs_txbp.local/` (or `http://10.0.0.1`) in a browser. If the page loads, then you are good 👍🏼.
+2. Get the local IP address of the Raspberry Pi (e.g. 172.20.10.2)
+3. Verify the connection by pinging the Pi from Local Computer: `ping 172.20.10.2`
 
-**4. Control the Drone from Computer:** You can control the drone using Mission Planner (QGroundControl) or a Python Script. For QGroundControl, refer to [this instruction](https://www.expresslrs.org/software/mavlink/#qgroundcontrol-setup-udp). In this project, we will focus on using Python Script for customizable missions & AI feature.
+### Step 2: Goggle & Video Link
 
-## Running the Script
+1. Connect your Goggles to the Local Computer via USB
+2. Ensure the camera feed is visible (verify `CAM_INDEX` in mission_controller.py)
 
-#### Prerequisites
+### Step 3: Launch Mission Control
 
-* Drone & Remote Controller powered on
-* Telemetry connected between Drone & Remote Controller
-* Ensure Configuration in `real_mission.py` correctly setup
-* Python version 3.10.14
-* Install required packages as below (or simply from `requirements.txt`, see [Run the script](#run-the-script)):
-
+1. On the Mac, navigate to your workspace and run:
 ```bash
-pip install dronekit
-pip install opencv-python
+# Run inference with mission control enabled (default)
+python3 inference.py --weights yolov8n.pt --source 0
 
-pip install dronekit-sitl   # For simulation only
+# Disable mission control if you only want inference
+python3 inference.py --weights yolov8n.pt --source 0 --no-mission
+
+# Adjust mission cooldown (default: 5 seconds)
+python3 inference.py --weights yolov8n.pt --source 0 --mission-cooldown-s 10.0
 ```
 
-#### Run the script
+**Note:** The communication bridge is now integrated into `inference.py` through the `MissionController` class, which bridges inference detections + keyboard control to the Raspberry Pi. The `mission_controller.py` file provides helper functions (`handle_detection`, `process_keypress`, `trigger_drone_action`) that are imported and used by `inference.py`.
+## 4. Usage & Controls
 
-* Connect to RC WIFI `ExpressLRS TX Backpack 000000 / expresslrs`
-* Check connection `http://10.0.0.1`
-* Run the script to connect
+### Manual Keyboard Hotkeys
+| Key | Action/Flight Mode        | Result/Description                                      |
+|-----|--------------------------|---------------------------------------------------------|
+| a   | Arm (STABILIZE)          | Switches to STABILIZE mode and arms motors              |
+| q   | Disarm                   | Immediately stops motors (Use with caution!)            |
+| b   | Brake                    | Halts the drone in its current 3D position              |
+| s   | Open Servo               | Manually triggers the drop mechanism                    |
+| x   | Exit                     | Shuts down the mission hub and bridge                   |
+| j   | Stabilize MODE           | Switches to manual flight with self-leveling            |
+| k   | Auto MODE                | Resumes the programmed mission plan                     |
+| l   | RTL MODE                 | Return to Launch point and Land                         |
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
+### Autonomous Detection Sequence
 
-pip install -r requirements.txt
+When the `MissionController` detects a "trash" object in the inference results, it automatically executes:
+1. Brake (b): Drone stops moving
+2. Drop (s): Pi cycles the servo (Open $\rightarrow$ 1s $\rightarrow$ Close)
+3. Resume (k): Drone switches back to AUTO to continue the mission
 
-python remote_communication/real_mission.py --real=true
-```
+The `MissionController` class in `inference.py` handles:
+- Processing keyboard input for manual control
+- Monitoring detection results from the YOLOv8 model
+- Automatically triggering the drop sequence when trash is detected
+- Managing cooldown periods to prevent repeated triggers
+- Disarming the drone on exit for safety
 
-## Servo Configuration
+## 5. Troubleshooting
 
-### Step-by-step guide
+* **Script Updates:** If you update `drone_control_listener.py`, run `sudo systemctl restart drone_bridge.service` on the Pi
+* **Mission Control Not Working:** Ensure `--no-mission` flag is not set. Check that `mission_controller.py` is in the same directory as `inference.py` (it provides the helper functions)
+* **Network Connection:** If you cannot send nc command to Raspberry Pi, make sure Local Computer & Raspberry Pi are on the same subnet (usually 172.20.10.x). In case they are not in the same subnet, try to manually setup the TCP/IP with following steps:
 
-Step 1: Hardware Wiring
-1. Flight Controller (FC) $\leftrightarrow$ Raspberry Pi:
-    * UART 4 accroding to specifications
-2. Raspberry Pi $\leftrightarrow$ Servo:
-    * Yellow: 13 (GPIO 27)
-    * Red: 4
-    * Brown (Ground): 14
+    1. Manually Setup TCP/IP
 
-Step 2: FC Configuration on QGroundControl
-| Parameter         | Value | Description                              |
-|-------------------|-------|------------------------------------------|
-| SERIAL4_PROTOCOL  | 2     | Sets protocol to MAVLink 2. **SERIAL4 due to UART4**.              |
-| SERIAL4_BAUD      | 921 (Old: 460)   | Sets speed to 921600 baud (fast link for Pi). Make sure BAUD config on Pi also matched. |
+        | Name        | Value                                      |
+        |---------------------------|---------------------------------------------------------|
+        | IP address                | 172.20.10.15 (same subnet with Pi)                      |
+        | Subnet mask               | 255.255.255.0 (netmask from `ifconfig en0 \| grep netmask`)                      |
+        | Router                | 172.20.10.255 (broadcast from `ifconfig en0 \| grep netmask`)                      |
 
-Step 3: Raspberry Pi Setup to listen for command from FC to trigger servo
-1. SSH into your Raspberry Pi
-2. Install dependencies `pip install pymavlink RPi.GPIO`
-3. Create a listener file `payload_listener.py`
+    2. Add to DNS Server: `172.20.10.1` & `8.8.8.8`
 
-```python
-from pymavlink import mavutil
-import RPi.GPIO as GPIO
-import time
-import sys
+## 6. Code Structure
 
-# --- CONFIGURATION ---
-# Replace with the Pi's UART port connected to FC
-# On Pi 3/4/Zero W, this is usually /dev/ttyS0 or /dev/ttyAMA0
-CONNECTION_STRING = '/dev/ttyS0' 
-BAUD_RATE = 921600
-SERVO_PIN = 18
+* **`inference.py`**: Main script that runs YOLOv8 inference and integrates mission control via `MissionController` class
+* **`mission_controller.py`**: Provides helper functions (`handle_detection`, `process_keypress`, `trigger_drone_action`) used by `inference.py`
+* **`drone_control_listener.py`**: Raspberry Pi script that listens for UDP commands and bridges them to the Flight Controller
+* **`commander.py`**: Standalone test script for sending commands to the Raspberry Pi
 
-# --- GPIO SETUP ---
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(SERVO_PIN, GPIO.OUT)
-pwm = GPIO.PWM(SERVO_PIN, 50) # 50Hz frequency
-pwm.start(0) # Start with 0 duty cycle (off)
+## 7. Remaining Work
 
-def move_servo(pwm_value):
-    """
-    Maps MAVLink PWM (1000-2000) to Duty Cycle (approx 2-12).
-    """
-    # 1000us = 0 deg, 2000us = 180 deg (approx)
-    # Duty Cycle = Pulse Width (ms) / Period (20ms) * 100
-    duty = (pwm_value / 1000.0) / 20.0 * 100.0
-    
-    GPIO.output(SERVO_PIN, True)
-    pwm.ChangeDutyCycle(duty)
-    time.sleep(0.5) # Wait for servo to reach position
-    
-    # Turn off signal to prevent jitter/buzzing
-    GPIO.output(SERVO_PIN, False)
-    pwm.ChangeDutyCycle(0)
-
-def main():
-    print(f"[Pi] Connecting to FC on {CONNECTION_STRING}...")
-    
-    # Establish MAVLink Connection
-    try:
-        master = mavutil.mavlink_connection(CONNECTION_STRING, baud=BAUD_RATE)
-    except Exception as e:
-        print(f"[ERROR] Could not connect to UART: {e}")
-        sys.exit(1)
-
-    print("[Pi] Waiting for Heartbeat...")
-    master.wait_heartbeat()
-    print("[Pi] Connected! Listening for Servo Commands...")
-
-    while True:
-        # Listen for COMMAND_LONG messages (blocking wait)
-        msg = master.recv_match(type='COMMAND_LONG', blocking=True)
-        
-        # Check for MAV_CMD_DO_SET_SERVO (ID 183)
-        if msg.command == 183:
-            servo_instance = int(msg.param1) # The "Servo Number"
-            pwm_value = int(msg.param2)      # The PWM value (1000-2000)
-
-            # Filter for our specific Servo ID (9)
-            if servo_instance == 9:
-                print(f"[Pi] Command Received: Servo 9 -> {pwm_value}")
-                move_servo(pwm_value)
-
-if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n[Pi] Stopping...")
-    finally:
-        pwm.stop()
-        GPIO.cleanup()
-```
-
-
-NOTE:
-* For `servo_listener.py` to test the listener from FC to RasberryPi and print `hello`. Enable serial in raspberry pi configs, try to run file again. After starting successfully, try to send command from the computer.
-* For servo, currently cannot make the servo work. Ask other teams how they setup the servo with rasberry pi
+* Update mission for demo
+* Figure autonomous flying 💀
