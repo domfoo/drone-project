@@ -292,10 +292,6 @@ class MissionController:
 
         print(f"[MISSION] Checking detection: {str(detections)}")
 
-        # Only trigger if the detection is a trash can
-        if detections.class_names[0] != "trash":
-            return
-
         self._last_trigger_ts = now
         self._in_progress = True
 
