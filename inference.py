@@ -39,7 +39,7 @@ from capture_utils import (
 )
 
 from threading import Thread
-from real_mission import handle_detection, process_keypress, trigger_drone_action
+from mission_controller import handle_detection, process_keypress, trigger_drone_action
 
 @dataclass
 class DetectionResult:
