@@ -1,54 +1,49 @@
 ---
 layout: default
-title: AI Application
+title: KI
 ---
 
-# AI Application
+# KI Anwendung
 
-## Overview
-WasteWing uses an AI system designed to detect illegal dumpsites from the drone's camera perspective.
-The AI component is based on a YOLOv8 object detection model.
+## Überblick
+WasteWing nutzt ein KI-System für die Erkennung illegalen Sperrmülls durch die Bilder der Drohnenkamera.
+Die KI wurde mit YOLOv8 trainiert.
 
-## Dataset
-The model was trained using the Dumpsite Detection Dataset [1].
+## Datensatz
+Das Modell wurde mit dem Dumpsite Detection Dataset [1] trainiert.
 
-### Dataset Characteristics:
-- Aerial images of waste and dumpsites
-- Annotated bounding boxes for dumpsite regions
-- Designed for object detection tasks
-- Includes variation in scale, terrain, and lighting conditions
+### Datensatz Charakteristiken:
+- Luftaufnahmen von Abfällen und Deponien
+- Annotierte Bounding Boxes für Deponie-Regionen
+- Ausgelegt für Objekterkennungsaufgaben
+- Enthält Variationen in Maßstab, Gelände und Lichtverhältnissen
 
 
 ## Training
-The model can be trained using the `yolo` command line application from ultralytics like so:
+Das Modell kann mithilfe der `yolo`-Kommandozeilenanwendung von Ultralytics trainiert werden, wobei ein vortrainiertes Basismodell für allgemeine Objekterkennung (`yolov8n.pt`) verwendet wird:
 
 ```bash
 yolo detect train model=yolov8n.pt data=data.yaml epochs=100 name=yolov8n_waste
 ```
 
-## Inference
-1. Drone camera captures live frames
-2. Frames are sent to a local computer with the YOLOv8 model
-3. YOLOv8 model performs inference
-4. Dumpsite detections are returned with:
-   - Bounding box coordinates
-   - Confidence score
-5. Results are processed and appropriate drone action commands are passed back to the drone
+## Ablauf der Inferenz
+1. Die Drohnenkamera erfasst Live-Bilder
+2. Die Bilder werden an einen lokalen Computer mit dem YOLOv8-Modell gesendet
+3. Die Inferenz wird mit dem YOLOv8-Modell durchgeführt
+4. Deponie-Erkennungen werden zurückgegeben mit:
+   - Koordinaten der Bounding Box
+   - Confidence Score
+5. Die Ergebnisse werden verarbeitet und entsprechende Aktionsbefehle an die Drohne zurückgegeben
 
-A processed frame might look like this:
+
+Verarbeteitete Bilder könnten so aussehen:
 ![](./val_batch2_pred.jpg)
 
 
-## Deployment
-- Runs on edge hardware onboard the drone
-- Supports real-time detection during flight
-- Can operate offline once deployed
+## Einschränkungen
+Die Genauigkeit der Erkennung hängt von der Flughöhe und der Bildqualität ab. Außerdem kann die Leistung bei extremen Wetterbedingungen oder schlechter Sicht beeinträchtigt werden.
 
-## Limitations
-- Detection accuracy depends on altitude and image clarity
-- Performance may degrade in extreme weather or low visibility
-
-## Dataset Reference
+## Datensatz Referenz
 
 [1] Dumpsite Detection Dataset.  
 Work. *Roboflow Universe*, 2025.  
