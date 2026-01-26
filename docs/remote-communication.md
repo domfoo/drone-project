@@ -116,7 +116,7 @@ Die Klasse *MissionController* übernimmt:
 
 ## 6. Code-Struktur
 
-* *inference.py*: Hauptskript für YOLOv8-Inferenz und Mission Control.
-* *mission_controller.py*: Enthält Hilfsfunktionen für Erkennung und Steuerung.
-* *drone_control_listener.py*: Pi-Skript, das auf UDP-Befehle wartet und diese an den FC weiterleitet.
-* *commander.py*: Separates Test-Skript zum Senden von Befehlen an den Pi.
+* **inference.py**: Hauptskript für YOLOv8-Inferenz und Mission Control.
+* **mission_controller.py**: Enthält Hilfsfunktionen für Erkennung und Steuerung.
+* **drone_control_listener.py**: Pi-Skript, das auf UDP-Befehle wartet und diese an den FC weiterleitet.
+* **commander.py**: Separates Test-Skript zum Senden von Befehlen an den Pi.
