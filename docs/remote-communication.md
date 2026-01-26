@@ -1,14 +1,14 @@
 ---
 layout: default
-title: Remote Communication
+title: Remote-Kommunikation
 ---
 
-# FERNKOMMUNIKATION MIT COMPANION COMPUTER (RASPBERRY PI)
+# Remote-Kommunikation mit Drohne
 
-Diese Dokumentation beschreibt die Kommunikation zwischen dem lokalen Computer und der Drohne.
+Diese Dokumentation beschreibt die Kommunikation zwischen dem lokalen Computer und dem Raspberry Pi auf der Drohne.
 
 ## 1. Systemarchitektur
-Das System nutzt eine entkoppelte Architektur, bei der der lokale Computer die rechenintensive KI-Verarbeitung übernimmt.
+Das Drohensystem nutzt eine entkoppelte Architektur, bei der der lokale Computer die rechenintensive KI-Verarbeitung übernimmt. Dabei lassen sind drei Komponenten ausmachen:
 
 * **Lokaler Computer:** Führt das KI-Modell *inference.py* aus und sendet Befehle via UDP. Die Klasse MissionController verbindet die KI-Erkennung und die Tastatursteuerung mit dem Raspberry Pi.
 
@@ -16,7 +16,7 @@ Das System nutzt eine entkoppelte Architektur, bei der der lokale Computer die r
 
 * **Flight Controller:** Führt die Befehle für Flugmodi (Brake, Auto, RTL), das Scharfschalten der Motoren (Arming) und Abwurf-Servo aus.
 
-## 2. Erstmalige Einrichtung
+## 2. Setup
 
 ### Computer-Konfiguration
 
@@ -24,11 +24,11 @@ Das System nutzt eine entkoppelte Architektur, bei der der lokale Computer die r
 
 ### Raspberry Pi Konfiguration
 
-* **Bridge-Skript:** Speichern Sie *drone_control_listener.py* unter */home/tpu/* ab.
+* **Bridge-Skript:** *drone_control_listener.py* muss unter */home/tpu/* abgespeichert werden
 
 * **Autostart-Einrichtung:** Erstellen Sie einen systemd-Dienst unter */etc/systemd/system/drone_bridge.service*, damit das Skript beim Booten automatisch startet.
 
-* **Hardware-Verbindung:** Verbinden Sie den Pi UART (/dev/serial0) mit dem FC UART und GPIO 18 mit dem Signalkabel des Servos.
+* **Hardware-Verbindung:** Verbinden Sie den UART des Raspberry Pi (/dev/serial0) mit dem UART des Flight Controllers. Verbinden sie GPIO 18 mit dem Signalkabel des Servos.
 
 ## 3. Betriebsablauf (Bei jedem Flug)
 
@@ -44,20 +44,20 @@ PASSWORT: geheim123
 2. Ermitteln Sie die lokale IP-Adresse des Raspberry Pi.
 3. Überprüfen Sie die Verbindung, indem Sie den Pi vom lokalen Computer aus anpingen.
 
-### Schritt 2: Goggles & Video-Verbindung
+### Schritt 2: FPV-Brille & Video-Verbindung
 
-1. Verbinden Sie Ihre Goggles via USB mit dem lokalen Computer.
-2. Stellen Sie sicher, dass der Kamera-Feed sichtbar ist (passen Sie die Videoquelle mit dem Parameter *source* an).
+1. Verbinden Sie die Skyzone Cobra X FPV-Brille via USB mit dem lokalen Computer.
+2. Stellen Sie sicher, dass der Kamera-Feed sichtbar ist (passen Sie die Videoquelle mit dem Parameter *source* an für `inference.py`).
 
 ### Schritt 3: Mission Control starten
 
 1. Navigieren Sie auf dem Computer zu Ihrem Arbeitsverzeichnis und führen Sie aus:
 
 ```bash
-# Run inference with mission control enabled (default)
+# inference mit mission control aktiviert (default)
 python3 inference.py --weights yolov8n_waste.pt --source 1
 
-# Disable mission control if you only want inference
+# mission control kann deaktiviert werden, wenn nur inference gewünscht ist
 python3 inference.py --weights yolov8n_waste.pt --source 1 --no-mission
 ```
 
@@ -80,7 +80,7 @@ python3 inference.py --weights yolov8n_waste.pt --source 1 --no-mission
 
 ### Autonome Erkennungssequenz
 
-Wenn der *MissionController* ein Müll erkennt, führt er automatisch aus:
+Wenn die inference eine Mülldeponie erkennt, führt das Skript folgendes automatisch aus:
 
 1. **Bremse (b):** Drohne stoppt die Bewegung.
 
@@ -93,23 +93,23 @@ Die Klasse *MissionController* übernimmt:
 * Verarbeitung von Tastatureingaben für manuelle Steuerung.
 * Überwachung der Erkennungsergebnisse des YOLOv8-Modells.
 * Automatisches Auslösen der Abwurfsequenz bei Müll-Erkennung.
-* Verwaltung von Sperrzeiten (Cooldown), um Mehrfachauslösungen zu verhindern.
+* Verwaltung von Abklingzeiten, um Mehrfachauslösungen zu verhindern.
 * Sicherer Disarm der Drohne beim Beenden.
 
 ## 5. Fehlerbehebung
 
 * **Skript-Updates:** Wenn Sie *drone_control_listener.py* aktualisieren, führen Sie sudo systemctl restart *drone_bridge.service* auf dem Pi aus.
 
-* **Mission Control funktioniert nicht:** Prüfen Sie, ob das Flag --no-mission gesetzt ist. Stellen Sie sicher, dass mission_controller.py im selben Verzeichnis wie inference.py liegt.
+* **Mission Control funktioniert nicht:** Prüfen Sie, ob das Flag --no-mission gesetzt ist.
 
-* **Netzwerkverbindung:** Wenn Sie keine Befehle an den Pi senden können, prüfen Sie, ob beide im selben Subnetz sind (meist 172.20.10.x). Falls nicht, konfigurieren Sie TCP/IP manuell:
+* **Netzwerkverbindung:** Wenn Sie keine Befehle an den Pi senden können, prüfen Sie, ob beide im selben Subnetz sind (meist 172.20.10.x). Falls nicht, konfigurieren Sie IP-Adressen manuell:
 
-    1. Manuelle TCP/IP Einrichtung
+    1. Manuelle Einrichtung
 
         | Name        | Wert                                      |
         |---------------------------|---------------------------------------------------------|
-        | IP address                | 172.20.10.15 (selbes Subnetz wie Pi)                      |
-        | Subnet mask               | 255.255.255.0 (netmask von *ifconfig en0 \| grep netmask*)                      |
+        | IP Adresse                | 172.20.10.15 (selbes Subnetz wie Pi)                      |
+        | Subnetzmaske               | 255.255.255.0 (Subnetzmaske von *ifconfig en0 \| grep netmask*)                      |
         | Router                | 172.20.10.255 (broadcast von *ifconfig en0 \| grep netmask*)                      |
 
     2. Fügen Sie zu DNS Server hinzu: *172.20.10.1* & *8.8.8.8*
@@ -119,4 +119,4 @@ Die Klasse *MissionController* übernimmt:
 * **inference.py**: Hauptskript für YOLOv8-Inferenz und Mission Control.
 * **mission_controller.py**: Enthält Hilfsfunktionen für Erkennung und Steuerung.
 * **drone_control_listener.py**: Pi-Skript, das auf UDP-Befehle wartet und diese an den FC weiterleitet.
-* **commander.py**: Separates Test-Skript zum Senden von Befehlen an den Pi.
+* **setup_test.py**: Test-Skript für die Systemvorraussetzungen des lokalen Computers
