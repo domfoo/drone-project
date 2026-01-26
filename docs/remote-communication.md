@@ -3,51 +3,55 @@ layout: default
 title: Remote Communication
 ---
 
-# REMOTE COMMUNICATION USING COMPANION COMPUTER (RASPBERRY PI)
+# FERNKOMMUNIKATION MIT COMPANION COMPUTER (RASPBERRY PI)
 
-This is the documentation for handling the communication between Local Computer and Drone.
+Diese Dokumentation beschreibt die Kommunikation zwischen dem lokalen Computer und der Drohne.
 
-## 1. System Architecture
-The system uses a decoupled architecture while the Local Computer handles heavy AI processing
+## 1. Systemarchitektur
+Das System nutzt eine entkoppelte Architektur, bei der der lokale Computer die rechenintensive KI-Verarbeitung übernimmt.
 
-* **Local Computer:** Runs the AI detection model *inference.py* and transmits commands via UDP using Netcat (nc). The *MissionController* class bridges inference detections + keyboard control to the Raspberry Pi
-* **Raspberry Pi:** Receives network packets via *drone_control_listener.py*, maintains a MAVLink heartbeat with the FC, bridges signals from Local Computer to Flight Controller and controls the servo via GPIO
-* **Flight Controller:** Executes signals for flight modes (Brake, Auto, RTL) and motor arming
+* **Lokaler Computer:** Führt das KI-Modell *inference.py* aus und sendet Befehle via UDP. Die Klasse MissionController verbindet die KI-Erkennung und die Tastatursteuerung mit dem Raspberry Pi.
 
-## 2. First-Time Setup
+* **Raspberry Pi:** Empfängt Netzwerkpakete über drone_control_listener.py, hält einen MAVLink-Heartbeat mit dem Flight Controller (FC) aufrecht, leitet Signale an den FC weiter und steuert den Servo über GPIO.
 
-### Computer Configuration
+* **Flight Controller:** Führt die Befehle für Flugmodi (Brake, Auto, RTL), das Scharfschalten der Motoren (Arming) und Abwurf-Servo aus.
 
-* Dependencies: Install OpenCV and ensure nc is available in your terminal
+## 2. Erstmalige Einrichtung
 
-### Raspberry Pi Configuration
+### Computer-Konfiguration
 
-* Bridge Script: Save *drone_control_listener.py* to */home/tpu/*
-* Auto-Run Setup: Create a systemd service at */etc/systemd/system/drone_bridge.service* to run the script on boot
-* Hardware Link: Connect Pi UART (/dev/serial0) to the FC UART and GPIO 18 to the servo signal wire
+* **Dependencies:** Installieren Sie Abhängigkeiten im *requirements.txt*.
 
-## 3. Operational Workflow (Every Flight)
+### Raspberry Pi Konfiguration
 
-### Step 1: Power & Network
+* **Bridge-Skript:** Speichern Sie *drone_control_listener.py* unter */home/tpu/* ab.
 
-1. Connect the Local Computer & Raspberry Pi to the same network (same subnet)
+* **Autostart-Einrichtung:** Erstellen Sie einen systemd-Dienst unter */etc/systemd/system/drone_bridge.service*, damit das Skript beim Booten automatisch startet.
+
+* **Hardware-Verbindung:** Verbinden Sie den Pi UART (/dev/serial0) mit dem FC UART und GPIO 18 mit dem Signalkabel des Servos.
+
+## 3. Betriebsablauf (Bei jedem Flug)
+
+### Schritt 1: Strom & Netzwerk
+
+1. Verbinden Sie den lokalen Computer und den Raspberry Pi mit demselben Netzwerk (gleiches Subnetz).
 
 ```
-WIFI NAME: drohn3 
-PASSWORD: geheim123
+WLAN-NAME: drohn3 
+PASSWORT: geheim123
 ```
 
-2. Get the local IP address of the Raspberry Pi (e.g. 172.20.10.2)
-3. Verify the connection by pinging the Pi from Local Computer
+2. Ermitteln Sie die lokale IP-Adresse des Raspberry Pi.
+3. Überprüfen Sie die Verbindung, indem Sie den Pi vom lokalen Computer aus anpingen.
 
-### Step 2: Goggle & Video Link
+### Schritt 2: Goggles & Video-Verbindung
 
-1. Connect your Goggles to the Local Computer via USB
-2. Ensure the camera feed is visible (adjust the video source with parameter *source*)
+1. Verbinden Sie Ihre Goggles via USB mit dem lokalen Computer.
+2. Stellen Sie sicher, dass der Kamera-Feed sichtbar ist (passen Sie die Videoquelle mit dem Parameter *source* an).
 
-### Step 3: Launch Mission Control
+### Schritt 3: Mission Control starten
 
-1. On the Computer, navigate to your workspace and run:
+1. Navigieren Sie auf dem Computer zu Ihrem Arbeitsverzeichnis und führen Sie aus:
 
 ```bash
 # Run inference with mission control enabled (default)
@@ -57,56 +61,62 @@ python3 inference.py --weights yolov8n_waste.pt --source 1
 python3 inference.py --weights yolov8n_waste.pt --source 1 --no-mission
 ```
 
-**Note:** The communication bridge is integrated into *inference.py* through the *MissionController* class, which bridges inference detections & keyboard control to the Raspberry Pi. The *mission_controller.py* file provides helper functions (*handle_detection*, *process_keypress*, *trigger_drone_action*).
+**Hinweis:** Die Kommunikationsbrücke ist über die Klasse MissionController in *inference.py* integriert. Sie verbindet KI-Erkennungen und Tastaturbefehle mit dem Raspberry Pi. Die Datei *mission_controller.py* enthält Hilfsfunktionen (*handle_detection*, *process_keypress*, *trigger_drone_action*).
 
-## 4. Usage & Controls
+## 4. Bedienung & Steuerung
 
-### Manual Keyboard Hotkeys
+### Manuelle Tastatur-Hotkeys
 
-| Key | Action/Flight Mode | Result/Description |
+| Taste | Aktion/Flugmodus | Beschreibung |
 |-----|-------------------|-------------------|
-| a   | Arm (STABILIZE)   | Switches to STABILIZE mode and arms motors |
-| q   | Disarm            | Immediately stops motors (Use with caution!) |
-| b   | Brake             | Halts the drone in its current 3D position |
-| s   | Open Servo        | Manually triggers the drop mechanism |
-| x   | Exit              | Shuts down the mission hub and bridge |
-| j   | Stabilize MODE    | Switches to manual flight with self-leveling |
-| k   | Auto MODE         | Resumes the programmed mission plan |
-| l   | RTL MODE          | Return to Launch point and Land |
+| a   | Arm (STABILIZE)   | Wechselt in STABILIZE und schaltet Motoren scharf |
+| q   | Disarm            | Stoppt Motoren sofort (Vorsicht!) |
+| b   | Brake             | Hält die Drohne an der aktuellen Position an |
+| s   | Open Servo        | Löst den Abwurfmechanismus manuell aus |
+| x   | Exit              | Schaltet den Mission Hub und die Bridge aus |
+| j   | Stabilize MODE    | Wechselt in den manuellen Flug mit Selbstnivellierung |
+| k   | Auto MODE         | Setzt den programmierten Missionsplan fort |
+| l   | RTL MODE          | Rückkehr zum Startpunkt und Landung |
 
-### Autonomous Detection Sequence
+### Autonome Erkennungssequenz
 
-When the *MissionController* detects a "trash" object in the inference results, it automatically executes:
-1. Brake (b): Drone stops moving
-2. Drop (s): Pi cycles the servo (Open $\rightarrow$ 1s $\rightarrow$ Close)
-3. Resume (k): Drone switches back to AUTO to continue the mission
+Wenn der *MissionController* ein Müll erkennt, führt er automatisch aus:
 
-The *MissionController* class handles:
-- Processing keyboard input for manual control
-- Monitoring detection results from the YOLOv8 model
-- Automatically triggering the drop sequence when trash is detected
-- Managing cooldown periods to prevent repeated triggers
-- Disarming the drone on exit for safety
+1. **Bremse (b):** Drohne stoppt die Bewegung.
 
-## 5. Troubleshooting
+2. **Abwurf (s):** Pi steuert den Servo an (Auf $\rightarrow$ 1s warten $\rightarrow$ Zu).
 
-* **Script Updates:** If you update *drone_control_listener.py*, run *sudo systemctl restart drone_bridge.service* on the Pi
-* **Mission Control Not Working:** Ensure *--no-mission* flag is not set. Check that *mission_controller.py* is in the same directory as *inference.py* (it provides the helper functions)
-* **Network Connection:** If you cannot send nc command to Raspberry Pi, make sure Local Computer & Raspberry Pi are on the same subnet (usually 172.20.10.x). In case they are not in the same subnet, try to manually setup the TCP/IP with following steps:
+3. **Fortsetzen (k):** Drohne wechselt zurück in den AUTO-Modus, um die Mission fortzuführen.
 
-    1. Manually Setup TCP/IP
+Die Klasse *MissionController* übernimmt:
 
-        | Name        | Value                                      |
+* Verarbeitung von Tastatureingaben für manuelle Steuerung.
+* Überwachung der Erkennungsergebnisse des YOLOv8-Modells.
+* Automatisches Auslösen der Abwurfsequenz bei Müll-Erkennung.
+* Verwaltung von Sperrzeiten (Cooldown), um Mehrfachauslösungen zu verhindern.
+* Sicherer Disarm der Drohne beim Beenden.
+
+## 5. Fehlerbehebung
+
+* **Skript-Updates:** Wenn Sie *drone_control_listener.py* aktualisieren, führen Sie sudo systemctl restart *drone_bridge.service* auf dem Pi aus.
+
+* **Mission Control funktioniert nicht:** Prüfen Sie, ob das Flag --no-mission gesetzt ist. Stellen Sie sicher, dass mission_controller.py im selben Verzeichnis wie inference.py liegt.
+
+* **Netzwerkverbindung:** Wenn Sie keine Befehle an den Pi senden können, prüfen Sie, ob beide im selben Subnetz sind (meist 172.20.10.x). Falls nicht, konfigurieren Sie TCP/IP manuell:
+
+    1. Manuelle TCP/IP Einrichtung
+
+        | Name        | Wert                                      |
         |---------------------------|---------------------------------------------------------|
-        | IP address                | 172.20.10.15 (same subnet with Pi)                      |
-        | Subnet mask               | 255.255.255.0 (netmask from *ifconfig en0 \| grep netmask*)                      |
-        | Router                | 172.20.10.255 (broadcast from *ifconfig en0 \| grep netmask*)                      |
+        | IP address                | 172.20.10.15 (selbes Subnetz wie Pi)                      |
+        | Subnet mask               | 255.255.255.0 (netmask von *ifconfig en0 \| grep netmask*)                      |
+        | Router                | 172.20.10.255 (broadcast von *ifconfig en0 \| grep netmask*)                      |
 
-    2. Add to DNS Server: *172.20.10.1* & *8.8.8.8*
+    2. Fügen Sie zu DNS Server hinzu: *172.20.10.1* & *8.8.8.8*
 
-## 6. Code Structure
+## 6. Code-Struktur
 
-* *inference.py*: Main script that runs YOLOv8 inference and integrates mission control via *MissionController* class
-* *mission_controller.py*: Provides helper functions (*handle_detection*, *process_keypress*, *trigger_drone_action*) used by *inference.py*
-* *drone_control_listener.py*: Raspberry Pi script that listens for UDP commands and bridges them to the Flight Controller
-* *commander.py*: Standalone test script for sending commands to the Raspberry Pi
+* *inference.py*: Hauptskript für YOLOv8-Inferenz und Mission Control.
+* *mission_controller.py*: Enthält Hilfsfunktionen für Erkennung und Steuerung.
+* *drone_control_listener.py*: Pi-Skript, das auf UDP-Befehle wartet und diese an den FC weiterleitet.
+* *commander.py*: Separates Test-Skript zum Senden von Befehlen an den Pi.
