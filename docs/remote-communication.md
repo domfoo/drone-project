@@ -51,10 +51,10 @@ PASSWORD: geheim123
 
 ```bash
 # Run inference with mission control enabled (default)
-python3 inference.py --weights yolov8n.pt --source 1
+python3 inference.py --weights yolov8n_waste.pt --source 1
 
 # Disable mission control if you only want inference
-python3 inference.py --weights yolov8n.pt --source 1 --no-mission
+python3 inference.py --weights yolov8n_waste.pt --source 1 --no-mission
 ```
 
 **Note:** The communication bridge is integrated into *inference.py* through the *MissionController* class, which bridges inference detections & keyboard control to the Raspberry Pi. The *mission_controller.py* file provides helper functions (*handle_detection*, *process_keypress*, *trigger_drone_action*).
