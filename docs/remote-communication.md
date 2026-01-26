@@ -8,7 +8,7 @@ title: Remote Communication
 This is the documentation for handling the communication between Local Computer and Drone.
 
 ## 1. System Architecture
-The system uses a decoupled architecture to ensure the Raspberry Pi's CPU remains free for hardware tasks while the Local Computer handles heavy AI processing
+The system uses a decoupled architecture while the Local Computer handles heavy AI processing
 
 * **Local Computer:** Runs the AI detection model (`inference.py`) and transmits commands via UDP using Netcat (nc). The `MissionController` class bridges inference detections + keyboard control to the Raspberry Pi
 * **Raspberry Pi:** Receives network packets via `drone_control_listener.py`, maintains a MAVLink heartbeat with the FC, bridges signals from Local Computer to Flight Controller and controls the servo via GPIO
@@ -61,16 +61,17 @@ python3 inference.py --weights yolov8n.pt --source 0 --mission-cooldown-s 10.0
 ## 4. Usage & Controls
 
 ### Manual Keyboard Hotkeys
-| Key | Action/Flight Mode        | Result/Description                                      |
-|-----|--------------------------|---------------------------------------------------------|
-| a   | Arm (STABILIZE)          | Switches to STABILIZE mode and arms motors              |
-| q   | Disarm                   | Immediately stops motors (Use with caution!)            |
-| b   | Brake                    | Halts the drone in its current 3D position              |
-| s   | Open Servo               | Manually triggers the drop mechanism                    |
-| x   | Exit                     | Shuts down the mission hub and bridge                   |
-| j   | Stabilize MODE           | Switches to manual flight with self-leveling            |
-| k   | Auto MODE                | Resumes the programmed mission plan                     |
-| l   | RTL MODE                 | Return to Launch point and Land                         |
+
+| Key | Action/Flight Mode | Result/Description |
+|-----|-------------------|-------------------|
+| a   | Arm (STABILIZE)   | Switches to STABILIZE mode and arms motors |
+| q   | Disarm            | Immediately stops motors (Use with caution!) |
+| b   | Brake             | Halts the drone in its current 3D position |
+| s   | Open Servo        | Manually triggers the drop mechanism |
+| x   | Exit              | Shuts down the mission hub and bridge |
+| j   | Stabilize MODE    | Switches to manual flight with self-leveling |
+| k   | Auto MODE         | Resumes the programmed mission plan |
+| l   | RTL MODE          | Return to Launch point and Land |
 
 ### Autonomous Detection Sequence
 
@@ -104,13 +105,7 @@ The `MissionController` class in `inference.py` handles:
 
 ## 6. Code Structure
 
-* **`inference.py`**: Main script that runs YOLOv8 inference and integrates mission control via `MissionController` class
-* **`mission_controller.py`**: Provides helper functions (`handle_detection`, `process_keypress`, `trigger_drone_action`) used by `inference.py`
-* **`drone_control_listener.py`**: Raspberry Pi script that listens for UDP commands and bridges them to the Flight Controller
-* **`commander.py`**: Standalone test script for sending commands to the Raspberry Pi
-
-## 7. Remaining Work
-
-* Update mission for demo
-* Figure autonomous flying 💀
-
+* `inference.py`: Main script that runs YOLOv8 inference and integrates mission control via `MissionController` class
+* `mission_controller.py`: Provides helper functions (`handle_detection`, `process_keypress`, `trigger_drone_action`) used by `inference.py`
+* `drone_control_listener.py`: Raspberry Pi script that listens for UDP commands and bridges them to the Flight Controller
+* `commander.py`: Standalone test script for sending commands to the Raspberry Pi
