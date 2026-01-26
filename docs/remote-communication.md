@@ -10,6 +10,8 @@ Diese Dokumentation beschreibt die Kommunikation zwischen dem lokalen Computer u
 ## 1. Systemarchitektur
 Das Drohensystem nutzt eine entkoppelte Architektur, bei der der lokale Computer die rechenintensive KI-Verarbeitung übernimmt. Dabei lassen sind drei Komponenten ausmachen:
 
+![Systemarchitektur Diagramm](/assets/remote_comm_architecture_diagram.jpg)
+
 * **Lokaler Computer:** Führt das KI-Modell *inference.py* aus und sendet Befehle via UDP. Die Klasse MissionController verbindet die KI-Erkennung und die Tastatursteuerung mit dem Raspberry Pi.
 
 * **Raspberry Pi:** Empfängt Netzwerkpakete über drone_control_listener.py, hält einen MAVLink-Heartbeat mit dem Flight Controller (FC) aufrecht, leitet Signale an den FC weiter und steuert den Servo über GPIO.

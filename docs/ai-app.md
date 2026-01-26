@@ -36,7 +36,7 @@ yolo detect train model=yolov8n.pt data=data.yaml epochs=100 name=yolov8n_waste
 5. Results are processed and appropriate drone action commands are passed back to the drone
 
 A processed frame might look like this:
-![](./val_batch2_pred.jpg)
+![](/assets/val_batch2_pred.jpg)
 
 
 ## Deployment
