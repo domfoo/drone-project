@@ -37,7 +37,7 @@ yolo detect train model=yolov8n.pt data=data.yaml epochs=100 name=yolov8n_waste
 
 
 Verarbeteitete Bilder könnten so aussehen:
-![](./val_batch2_pred.jpg)
+![](./assets/val_batch2_pred.jpg)
 
 
 ## Einschränkungen
