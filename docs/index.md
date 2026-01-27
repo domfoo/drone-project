@@ -17,6 +17,9 @@ Das Projekt wurde im Rahmen des Projektmoduls "Drohnen mit Künstlicher Intellig
 - Nhat Khanh Hoang
 - Gajus Petrauskas
 
+## Projektposter
+
+<embed src="assets/poster.pdf" type="application/pdf" width="100%" height="600px" />
 
 ## Links
 * [Projektwebseite](https://www.christianbaun.de/Master_Projekt_WS2526/index.html)
