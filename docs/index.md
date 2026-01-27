@@ -19,7 +19,7 @@ Das Projekt wurde im Rahmen des Projektmoduls "Drohnen mit Künstlicher Intellig
 
 ## Projektposter
 
-<embed src="assets/poster.pdf" type="application/pdf" width="100%" height="600px" />
+[![Projektposter](assets/poster.jpg)](assets/poster.pdf)
 
 ## Links
 * [Projektwebseite](https://www.christianbaun.de/Master_Projekt_WS2526/index.html)
