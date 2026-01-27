@@ -19,6 +19,8 @@ This project implements a real-time trash detection system for drones using YOLO
 - **`setup_test.py`** - Check if local computer is correctly setup for WasteWing
 - **`yolov8n_waste.pt`** - Pre-trained YOLOv8 model weights file
 
+The project poster and the 3d printable drop mechanism can be found in the `assets` folder.
+
 ## Basic Usage
 
 ### Prerequisites
