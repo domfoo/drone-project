@@ -26,6 +26,10 @@ Das Modell kann mithilfe der `yolo`-Kommandozeilenanwendung von Ultralytics trai
 yolo detect train model=yolov8n.pt data=data.yaml epochs=100 name=yolov8n_waste
 ```
 
+Die folgende Abbildung zeigt unseren Trainingsverlauf des YOLOv8-Modells mit Verlustfunktionen sowie den Leistungskennzahlen Precision, Recall und mAP über alle Epochen.
+
+![](./assets/results.png)
+
 ## Ablauf der Inferenz
 1. Die Drohnenkamera erfasst Live-Bilder
 2. Die Bilder werden an einen lokalen Computer mit dem YOLOv8-Modell gesendet
