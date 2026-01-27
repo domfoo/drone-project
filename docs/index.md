@@ -19,5 +19,5 @@ Das Projekt wurde im Rahmen des Projektmoduls "Drohnen mit Künstlicher Intellig
 
 
 ## Links
-**Projektwebseite**: https://www.christianbaun.de/Master_Projekt_WS2526/index.html
-**Quellcode**: https://github.com/domfoo/drone-project
+* [Projektwebseite](https://www.christianbaun.de/Master_Projekt_WS2526/index.html)
+* [Quellcode (GitHub)](https://github.com/domfoo/drone-project)
