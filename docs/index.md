@@ -12,6 +12,12 @@ Das Projekt wurde im Rahmen des Projektmoduls "Drohnen mit Künstlicher Intellig
 
 **Modulverantwortlicher**: Prof. Dr. Christian Baun
 
+**Projektgruppe**:
+- Dominik Bartsch
+- Nhat Khanh Hoang
+- Gajus Petrauskas
+
+
 ## Links
 **Projektwebseite**: https://www.christianbaun.de/Master_Projekt_WS2526/index.html
 **Quellcode**: https://github.com/domfoo/drone-project
