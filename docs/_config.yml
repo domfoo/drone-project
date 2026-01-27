@@ -1,3 +1,10 @@
 title: WasteWing
 theme: minima
 markdown: kramdown
+
+# navbar only for specific sites
+header_pages:
+  - hardware.md
+  - remote-communication.md
+  - autopilot.md
+  - ai-app.md
