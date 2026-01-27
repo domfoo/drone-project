@@ -15,12 +15,12 @@ Der Dropmechanismus besteht aus drei Einzelteilen:
 
 ### Die Halterung
 
-![](./dropmechanism.png)
+![](./assets/dropmechanism.png)
 *Die Halterung mit angepassten Befestitungslöchern*
 
 Als Vorlage für die Halterung diente uns [1]. Das Modell wurde mit Tinkercad angepasst, damit es an unserem Rahmen befestigt werden kann.
 
-![](./finished-servo.webp)
+![](./assets/finished-servo.webp)
 *Der komplette Dropmechanismus als 3D-Modell*
 
 ## Ansteuerung des Servomotors
