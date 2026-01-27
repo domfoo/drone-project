@@ -4,9 +4,9 @@ A real-time object detection system for drones using YOLOv8, developed as part o
 
 ## Team Members
 
-- Nhat Khanh Hoang
 - Dominik Bartsch
-- Gajus
+- Gajus Petrauskas
+- Nhat Khanh Hoang
 
 ## Project Overview
 
