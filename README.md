@@ -16,7 +16,8 @@ This project implements a real-time trash detection system for drones using YOLO
 
 - **`inference.py`** - Main script for running the YOLOv8 model inference on video streams
 - **`real_mission.py`** - Handles communication between the local computer and the drone through Raspberry Pi (UDP-based)
-- **`yolov8n.pt`** - Pre-trained YOLOv8 model weights file
+- **`setup_test.py`** - Check if local computer is correctly setup for WasteWing
+- **`yolov8n_waste.pt`** - Pre-trained YOLOv8 model weights file
 
 ## Basic Usage
 
@@ -27,17 +28,18 @@ This project implements a real-time trash detection system for drones using YOLO
    ```bash
    pip install -r requirements.txt
    ```
+   Make sure `torch` and `torchvision` are installed with GPU support to ensure maximum inference performance.
 
 ### Running the Model
 
 Run the inference script with the model weights:
 
 ```bash
-python inference.py -w yolov8n.pt -s 1 --show
+python inference.py -w yolov8n_waste.pt -s 1 --show
 ```
 
 **Parameters:**
-- `-w` / `--weights`: Path to the model weights file (e.g., `yolov8n.pt`)
+- `-w` / `--weights`: Path to the model weights file (e.g., `yolov8n_waste.pt`)
 - `-s` / `--source`: Video source (0 for webcam, 1 for capture card, or path to video file)
 - `--show`: Display the detection results in real-time
 
@@ -48,6 +50,16 @@ For more advanced usage, see the help menu:
 ```bash
 python inference.py --help
 ```
+
+
+### Using uv
+This project can be run using `uv` as well
+
+```bash
+uv sync
+uv run inference -w yolov8n_waste.pt -s 1
+```
+
 
 ## Requirements
 
